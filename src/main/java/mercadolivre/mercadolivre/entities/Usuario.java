@@ -1,86 +1,74 @@
 package mercadolivre.mercadolivre.entities;
 
 
-import org.springframework.data.annotation.Id;
+import org.hibernate.annotations.CreationTimestamp;
 
-import javax.persistence.Column;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
+import javax.persistence.*;
+import javax.validation.constraints.Email;
+import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.PastOrPresent;
 import java.time.LocalDateTime;
 
 public class Usuario implements UserDetails {
 
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotNull
-    @Column(nullable = true)
+    @NotBlank
+    @Email
+    @Column(nullable = false, unique = true)
     private String email;
 
-    @NotNull
-    @Column(nullable = true)
+    @NotBlank @Length(min = 6)
+    @Column(nullable = false)
     private String senha;
 
-    @NotNull
-    @Column(nullable = true)
-    @PastOrPresent
-    private LocalDateTime localDateTime;
+    @CreationTimestamp
+    @Column(columnDefinition = "datetime", nullable = false)
+    private LocalDateTime localDateTime
+            ;
 
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "tb_user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private List<Role> authorities = new ArrayList<>();
 
-    public Usuario(String email, String senha, LocalDateTime localDateTime) {
+    @Deprecated
+    public User() {
+    }
+
+    public User(String email, RawPassword rawPassword) {
         this.email = email;
-        this.senha =  senha;
-        this.localDateTime = localDateTime;
-    }
-
-    public Usuario( ) {
-    }
-
-    @Override
-    public String toString() {
-        return email ;
+        this.password = rawPassword.getPassword();
     }
 
     public Long getId() {
-        return  this.id;
+        return id;
+    }
+
+    @PrePersist
+    private void prePersist() {
+        this.password = encodingPassword(this.password);
+    }
+
+    private String encodingPassword(String rawPassword) {
+        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
+        return encoder.encode(rawPassword);
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return null;
+        return this.authorities;
     }
 
-    @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + ((id == null) ? 0 : id.hashCode());
-        return result;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        Usuario other = (Usuario) obj;
-        if (id == null) {
-            if (other.id != null)
-                return false;
-        } else if (!id.equals(other.id))
-            return false;
-        return true;
-    }
-
-    @Override
-    public String getPassword() {
-        return this.senha;
+    public String getSenha() {
+        return this.password;
     }
 
     @Override
@@ -106,5 +94,18 @@ public class Usuario implements UserDetails {
     @Override
     public boolean isEnabled() {
         return true;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof User)) return false;
+        User user = (User) o;
+        return Objects.equals(id, user.id) && Objects.equals(email, user.email);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, email);
     }
 }
